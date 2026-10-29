@@ -1,0 +1,105 @@
+const Item = require('../models/Item');
+const { summarizeText } = require('./aiService');
+
+const summarizePendingItems = async (limit = 5) => {
+    const safeLimit = Math.min(Math.max(limit, 1), 10);
+
+    const items = await Item.find({
+        type: 'news',
+        rawText: { $exists: true, $ne: '' },
+        $or: [
+            { summary: { $exists: false } },
+            { summary: '' },
+            { summary: null }
+        ]
+    })
+        .sort({ publishedAt: -1 })
+        .limit(safeLimit)
+        .select('_id title type rawText summary');
+
+    const stats = {
+        found: items.length,
+        summarized: 0,
+        skipped: 0,
+        failed: 0
+    };
+
+    for (const item of items) {
+        try {
+            console.log(`Summarizing: ${item.title}`);
+
+            const sourceText = (item.rawText || '').trim();
+            const wordCount = sourceText.split(/\s+/).filter(Boolean).length;
+
+            if (wordCount < 40) {
+                stats.skipped++;
+
+                console.log(
+                    `Skipped: source text is too short (${wordCount} words).`
+                );
+
+                continue;
+            }
+
+            const summary = await summarizeText(sourceText);
+
+            if (
+                !summary ||
+                summary === 'INSUFFICIENT_SOURCE' ||
+                summary.trim().split(/\s+/).length < 12
+            ) {
+                stats.skipped++;
+
+                console.log(
+                    'Skipped: the source did not produce a usable summary.'
+                );
+
+                continue;
+            }
+
+            const result = await Item.updateOne(
+                {
+                    _id: item._id,
+                    $or: [
+                        { summary: { $exists: false } },
+                        { summary: '' },
+                        { summary: null }
+                    ]
+                },
+                {
+                    $set: { summary: summary.trim() }
+                }
+            );
+
+            if (result.modifiedCount === 1) {
+                stats.summarized++;
+                console.log('Summary saved.');
+            } else {
+                console.log('Item already summarized; skipped saving.');
+            }
+        }
+        catch (error) {
+            stats.failed++;
+
+            console.error(
+                `Summary failed for "${item.title}":`,
+                error.message
+            );
+
+            // Stop processing when the provider's daily quota is exhausted.
+            if (error.isQuotaExhausted) {
+                console.warn(
+                    'AI quota exhausted. Stopping the remaining summaries.'
+                );
+
+                break;
+            }
+        }
+    }
+
+    console.log('Summary generation finished:', stats);
+
+    return stats;
+};
+
+module.exports = { summarizePendingItems };
