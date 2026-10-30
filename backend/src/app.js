@@ -16,7 +16,7 @@ const authRoutes = require('./routes/authRoutes');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const allowedOrigins = ['http://localhost:5173', 'http://localhost:8080', ...(process.env.FRONTEND_URL || '').split(',').map(url => url.trim()).filter(Boolean)];
+const allowedOrigins = ['http://localhost:5173', 'http://localhost:8080', ...(process.env.FRONTEND_URL || '').split(','), ...(process.env.CORS_ORIGIN || '').split(',')].map(url => url.trim().replace(/\/$/, '')).filter(Boolean);
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
 app.use('/api/health', healthRoutes);
