@@ -6,3 +6,10 @@ dist/
 .DS_Store
 coverage/
 *.log
+
+# Local Python environment
+backend/python/.venv/
+
+# Python cache files
+__pycache__/
+*.py[cod]

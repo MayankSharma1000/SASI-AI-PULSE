@@ -31,6 +31,10 @@ const rankItems = (items, profile = {}) => {
     );
 
     return items
+        .filter(item => {
+            const itemId = String(item._id || item.id || '');
+            return !dismissedItemIds.has(itemId);
+        })
         .map(item => {
             let relevanceScore = 0;
             const itemId = String(item._id || item.id || '');

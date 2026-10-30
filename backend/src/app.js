@@ -11,13 +11,15 @@ const healthRoutes = require('./routes/healthRoutes');
 const itemRoutes = require('./routes/itemRoutes');
 const feedbackRoutes = require('./routes/feedbackRoutes');
 const profileRoutes = require('./routes/profileRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors({ origin: 'http://localhost:5173' }));
+app.use(cors({ origin: ['http://localhost:5173', 'http://localhost:8080'], credentials: true }));
 app.use(express.json());
 app.use('/api/health', healthRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/items', itemRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/profiles', profileRoutes);

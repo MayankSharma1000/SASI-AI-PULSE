@@ -1,6 +1,6 @@
 const Item = require('../models/Item');
 const Cluster = require('../models/Cluster');
-const { findSimilarItems } = require('./clusteringService');
+const { clusterMatches } = require('./pythonClusteringService');
 
 const SIMILARITY_THRESHOLDS = {
     news: 0.40,
@@ -49,7 +49,25 @@ const assignCluster = async (itemId) => {
             .lean()
         : [];
 
-    const matches = findSimilarItems(item, representatives, threshold);
+    const pythonMatches = await clusterMatches(
+        item,
+        representatives,
+        threshold
+    );
+
+    const representativeById = new Map(
+        representatives.map(representative => [
+            String(representative._id),
+            representative
+        ])
+    );
+
+    const matches = pythonMatches
+        .map(match => ({
+            item: representativeById.get(match.id),
+            similarity: match.similarity
+        }))
+        .filter(match => match.item);
 
     let targetClusterId;
 

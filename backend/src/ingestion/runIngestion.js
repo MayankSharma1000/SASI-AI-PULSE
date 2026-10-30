@@ -149,7 +149,7 @@ const runIngestion = async () => {
         try {
             console.log('\nStarting pending news summaries...');
 
-            stats.summaryResult = await summarizePendingItems(5);
+            stats.summaryResult = await summarizePendingItems(10);
 
             console.log(
                 'Summary generation result:',

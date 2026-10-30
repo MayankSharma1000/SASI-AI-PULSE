@@ -5,6 +5,7 @@ const API_BASE = (
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
+    credentials: 'include',
     headers: {
       Accept: 'application/json',
       ...(options.body ? { 'Content-Type': 'application/json' } : {}),
@@ -33,15 +34,67 @@ async function request(path, options = {}) {
 export const api = {
   baseUrl: API_BASE,
 
+  async register(name, email, password) {
+    return request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ name, email, password })
+    });
+  },
+
+  async login(email, password) {
+    return request('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password })
+    });
+  },
+
+  async getSession() {
+    return request('/auth/me');
+  },
+
+  async logout() {
+    return request('/auth/logout', { method: 'POST' });
+  },
+
+  async completeOnboarding(values) {
+    return request('/auth/onboarding', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        goal: values.goal || 'student',
+        interests: values.topics || [],
+        projectDescription: values.project || ''
+      })
+    });
+  },
+
+  async updateProfile(values) {
+    return request('/profiles', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: values.name,
+        goal: values.goal || 'student',
+        interests: values.topics || [],
+        projectDescription: values.project || ''
+      })
+    });
+  },
+
   async getFeed(profileId, mode = 'personalized') {
     const common = new URLSearchParams({ limit: '50', mode });
-    if (profileId && mode !== 'explore') common.set('userId', profileId);
 
-    // Fetch papers and news independently so a recent burst of news cannot
-    // crowd every research paper out of the mixed feed.
+    if (profileId && mode !== 'explore') {
+      common.set('userId', profileId);
+    }
+
     const [paperResult, newsResult] = await Promise.all([
-      request(`/items?${new URLSearchParams({ ...Object.fromEntries(common), type: 'paper' })}`),
-      request(`/items?${new URLSearchParams({ ...Object.fromEntries(common), type: 'news' })}`)
+      request(`/items?${new URLSearchParams({
+        ...Object.fromEntries(common),
+        type: 'paper'
+      })}`),
+      request(`/items?${new URLSearchParams({
+        ...Object.fromEntries(common),
+        type: 'news'
+      })}`)
     ]);
 
     return {
@@ -50,48 +103,22 @@ export const api = {
     };
   },
 
-  async createProfile(profile) {
-    let userId =
-      profile.id ||
-      profile._id ||
-      localStorage.getItem('sasi-user-id');
-
-    if (!userId) {
-      userId = crypto.randomUUID();
-    }
-
-    const result = await request('/profiles', {
-      method: 'POST',
-      body: JSON.stringify({
-        userId,
-        name: profile.name || 'AI Explorer',
-        goal: profile.goal || 'student',
-        interests: profile.topics || [],
-        projectDescription: profile.project || ''
-      })
-    });
-
-    localStorage.setItem('sasi-user-id', userId);
-
-    return result;
+  async getSavedItems() {
+    return request('/feedback/saved');
   },
 
-  async getProfile(profileId) {
-    return request(`/profiles/${encodeURIComponent(profileId)}`);
+  async getLikedItems() {
+    return request('/feedback/liked');
   },
 
-  async sendFeedback(itemId, action, profileId) {
-    if (!profileId) {
-      throw new Error('Complete profile setup before submitting feedback.');
-    }
+  async getDismissedItems() {
+    return request('/feedback/dismissed');
+  },
 
+  async sendFeedback(itemId, action) {
     return request('/feedback', {
       method: 'POST',
-      body: JSON.stringify({
-        userId: profileId,
-        itemId,
-        action
-      })
+      body: JSON.stringify({ itemId, action })
     });
   }
 };

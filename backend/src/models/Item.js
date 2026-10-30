@@ -31,6 +31,10 @@ const itemSchema = new mongoose.Schema(
             type: String,
             required: true
         },
+        imageUrl: {
+            type: String,
+            default: ''
+        },
         rawText: {
             type: String,
             default: ''

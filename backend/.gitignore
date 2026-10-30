@@ -1,7 +1,8 @@
-cat > .gitignore <<'EOF'
 node_modules/
 .env
+.env.*
+!.env.example
 .DS_Store
 coverage/
 *.log
-EOF
+python/.venv/

@@ -110,6 +110,67 @@ const getBestArticleText = (article) => {
     );
 };
 
+const getArticleImage = (article) => {
+    const candidates = [
+        article.enclosure?.['@_url'],
+        article['media:content']?.['@_url'],
+        article['media:thumbnail']?.['@_url'],
+        article['itunes:image']?.['@_href'],
+        article.image?.['@_url'],
+        article.image?.['@_href'],
+        article.image,
+    ];
+
+    for (const candidate of candidates) {
+        const value = typeof candidate === 'string'
+            ? candidate
+            : candidate?.['@_url'] || candidate?.['@_href'] || '';
+
+        if (!value) continue;
+
+        try {
+            const url = new URL(value);
+
+            if (
+                (url.protocol === 'https:' || url.protocol === 'http:') &&
+                !/\.(mp4|webm|mov|avi|m4v)$/i.test(url.pathname)
+            ) {
+                return url.href;
+            }
+        } catch {
+            continue;
+        }
+    }
+
+    const html = [
+        getText(article['content:encoded']),
+        getText(article.content),
+        getText(article.description),
+        getText(article.summary)
+    ].join(' ');
+
+    const match = html.match(/<img\b[^>]*\bsrc=["']([^"']+)["']/i);
+
+    if (match) {
+        try {
+            const url = new URL(
+                decodeHtmlEntities(match[1]),
+                getArticleLink(article)
+            );
+
+            if (
+                (url.protocol === 'https:' || url.protocol === 'http:') &&
+                !/\.(mp4|webm|mov|avi|m4v)$/i.test(url.pathname)
+            ) {
+                return url.href;
+            }
+        } catch {
+            // Ignore malformed image URLs.
+        }
+    }
+
+    return '';
+};
 const MIN_ARTICLE_WORDS = 40;
 
 const countWords = (text = '') =>
@@ -270,6 +331,7 @@ const normalizeArticle = (article, source) => {
         externalId: url,
         title,
         url,
+        imageUrl: getArticleImage(article),
         publishedAt,
         rawText,
         summary: '',

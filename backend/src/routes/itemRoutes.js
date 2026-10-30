@@ -2,6 +2,7 @@ const express = require('express');
 const UserProfile = require('../models/UserProfile');
 const Item = require('../models/Item');
 const { rankItems } = require('../services/rankingService');
+const { optionalAuth } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
@@ -9,7 +10,7 @@ const router = express.Router();
 // Query parameters:
 // userId, type, topic, limit
 // interests, likedTopics, projectDescription (optional overrides)
-router.get('/', async (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
     try {
         // 1. Validate and normalize the requested limit.
         const requestedLimit = Number.parseInt(req.query.limit, 10);
@@ -52,9 +53,13 @@ router.get('/', async (req, res) => {
 
         let profileSource = 'default';
 
-        if (req.query.userId && !exploreMode) {
+        if (!exploreMode && !req.auth) {
+            return res.status(401).json({ error: 'Please log in to view your personalized feed.' });
+        }
+
+        if (req.auth && !exploreMode) {
             const savedProfile = await UserProfile.findOne({
-                userId: req.query.userId
+                userId: req.auth.profileId
             }).lean();
 
             if (savedProfile) {
@@ -63,7 +68,7 @@ router.get('/', async (req, res) => {
             } else {
                 return res.status(404).json({
                     error: 'User profile not found.',
-                    userId: req.query.userId
+                    userId: req.auth.profileId
                 });
             }
         }
@@ -102,7 +107,11 @@ router.get('/', async (req, res) => {
             .lean();
 
         // 7. Rank all candidates before deduplicating.
-        const rankedItems = rankItems(items, profile);
+        const rankedItems = exploreMode
+            ? items.sort((a, b) =>
+                new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0)
+              )
+            : rankItems(items, profile);
 
         // 8. Keep the highest-ranked representative from each cluster.
         // Items without a cluster are kept unless their normalized title
@@ -150,7 +159,7 @@ router.get('/', async (req, res) => {
             limit,
             totalPages: Math.max(1, Math.ceil(total / limit)),
             filters: {
-                userId: req.query.userId || null,
+                userId: req.auth?.profileId || null,
                 type: req.query.type || 'all',
                 topic: req.query.topic || null,
                 limit
